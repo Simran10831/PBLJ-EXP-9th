@@ -1,0 +1,121 @@
+// Student.java
+package com.example.hibernatecrud;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name="student")
+public class Student {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+    private String name;
+    private String email;
+
+    public Student() {}
+
+    public Student(String name, String email) {
+        this.name = name;
+        this.email = email;
+    }
+
+    // getters & setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+}
+// StudentDAO.java
+package com.example.hibernatecrud;
+
+import org.hibernate.*;
+import org.hibernate.cfg.Configuration;
+import java.util.List;
+
+public class StudentDAO {
+    private SessionFactory factory;
+
+    public StudentDAO() {
+        factory = new Configuration().configure("hibernate.cfg.xml").buildSessionFactory();
+    }
+
+    public void addStudent(Student student) {
+        Session session = factory.openSession();
+        Transaction tx = session.beginTransaction();
+        session.save(student);
+        tx.commit();
+        session.close();
+    }
+
+    public List<Student> getAllStudents() {
+        Session session = factory.openSession();
+        List<Student> list = session.createQuery("from Student", Student.class).list();
+        session.close();
+        return list;
+    }
+
+    public void updateStudent(int id, String newEmail) {
+        Session session = factory.openSession();
+        Transaction tx = session.beginTransaction();
+        Student student = session.get(Student.class, id);
+        if (student != null) {
+            student.setEmail(newEmail);
+            session.update(student);
+        }
+        tx.commit();
+        session.close();
+    }
+
+    public void deleteStudent(int id) {
+        Session session = factory.openSession();
+        Transaction tx = session.beginTransaction();
+        Student student = session.get(Student.class, id);
+        if (student != null) session.delete(student);
+        tx.commit();
+        session.close();
+    }
+}
+// MainApp.java
+package com.example.hibernatecrud;
+
+import java.util.List;
+
+public class MainApp {
+    public static void main(String[] args) {
+        StudentDAO dao = new StudentDAO();
+
+        // Create
+        dao.addStudent(new Student("Simran", "simran@example.com"));
+
+        // Read
+        List<Student> list = dao.getAllStudents();
+        list.forEach(s -> System.out.println(s.getId() + " " + s.getName() + " " + s.getEmail()));
+
+        // Update
+        dao.updateStudent(1, "simran_new@example.com");
+
+        // Delete
+        dao.deleteStudent(1);
+    }
+}
+<!-- hibernate.cfg.xml -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+ "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+ "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+ <session-factory>
+   <property name="hibernate.dialect">org.hibernate.dialect.MySQL8Dialect</property>
+   <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
+   <property name="hibernate.connection.url">jdbc:mysql://localhost:3306/test</property>
+   <property name="hibernate.connection.username">root</property>
+   <property name="hibernate.connection.password">your_password</property>
+   <property name="hibernate.hbm2ddl.auto">update</property>
+   <property name="show_sql">true</property>
+
+   <mapping class="com.example.hibernatecrud.Student"/>
+ </session-factory>
+</hibernate-configuration>
