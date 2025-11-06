@@ -1,0 +1,139 @@
+// Account.java
+package com.example.transaction;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name="account")
+public class Account {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+    private String name;
+    private double balance;
+
+    public Account() {}
+    public Account(String name, double balance) {
+        this.name = name;
+        this.balance = balance;
+    }
+
+    // getters & setters
+}
+// AccountDAO.java
+package com.example.transaction;
+
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class AccountDAO {
+
+    @Autowired
+    private SessionFactory sessionFactory;
+
+    public Account getAccount(int id) {
+        return sessionFactory.getCurrentSession().get(Account.class, id);
+    }
+
+    public void updateAccount(Account account) {
+        sessionFactory.getCurrentSession().update(account);
+    }
+}
+// BankService.java
+package com.example.transaction;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class BankService {
+
+    @Autowired
+    private AccountDAO accountDAO;
+
+    @Transactional
+    public void transfer(int fromId, int toId, double amount) {
+        Account from = accountDAO.getAccount(fromId);
+        Account to = accountDAO.getAccount(toId);
+
+        if (from.getBalance() < amount)
+            throw new RuntimeException("Insufficient balance!");
+
+        from.setBalance(from.getBalance() - amount);
+        to.setBalance(to.getBalance() + amount);
+
+        accountDAO.updateAccount(from);
+        accountDAO.updateAccount(to);
+    }
+}
+// AppConfig.java
+package com.example.transaction;
+
+import java.util.Properties;
+import javax.sql.DataSource;
+import org.hibernate.SessionFactory;
+import org.springframework.context.annotation.*;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.orm.hibernate5.*;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+@Configuration
+@EnableTransactionManagement
+@ComponentScan(basePackages = "com.example.transaction")
+public class AppConfig {
+
+    @Bean
+    public DataSource dataSource() {
+        DriverManagerDataSource ds = new DriverManagerDataSource();
+        ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        ds.setUrl("jdbc:mysql://localhost:3306/test");
+        ds.setUsername("root");
+        ds.setPassword("your_password");
+        return ds;
+    }
+
+    @Bean
+    public LocalSessionFactoryBean sessionFactory() {
+        LocalSessionFactoryBean factory = new LocalSessionFactoryBean();
+        factory.setDataSource(dataSource());
+        factory.setPackagesToScan("com.example.transaction");
+        factory.setHibernateProperties(hibernateProperties());
+        return factory;
+    }
+
+    @Bean
+    public HibernateTransactionManager transactionManager(SessionFactory sf) {
+        return new HibernateTransactionManager(sf);
+    }
+
+    private Properties hibernateProperties() {
+        Properties props = new Properties();
+        props.put("hibernate.dialect", "org.hibernate.dialect.MySQL8Dialect");
+        props.put("hibernate.hbm2ddl.auto", "update");
+        props.put("hibernate.show_sql", "true");
+        return props;
+    }
+}
+// MainApp.java
+package com.example.transaction;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class MainApp {
+    public static void main(String[] args) {
+        ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        BankService bankService = context.getBean(BankService.class);
+
+        try {
+            bankService.transfer(1, 2, 1000);
+            System.out.println("Transaction successful!");
+        } catch (Exception e) {
+            System.out.println("Transaction failed: " + e.getMessage());
+        }
+    }
+}
